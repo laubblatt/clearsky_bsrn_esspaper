@@ -139,4 +139,12 @@ qryrmon <- dt30[ , calc_ClearSky_QuantileRegression_MonthlyTimeWindow(Date = Dat
                            mc.cores = 10,tau = 0.85, pdev = 0.25), by = SiteCode]
 )
 
+Error in `[.data.table`(dth, , calc_ClearSky_QuantileRegression(IncomingShortwave,  : 
+                                                                  j doesn't evaluate to the same number of columns for each group
+6
+ `[.data.table`(dth, , calc_ClearSky_QuantileRegression(IncomingShortwave, 
+    IncomingShortwavePotential, tau), by = list(year(Date), month(Date))) at
+ ClearSkyQuantileRegression.R#155
+5                                                                
+
 
