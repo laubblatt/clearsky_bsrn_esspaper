@@ -2,6 +2,14 @@
 #' 
 #' @filename clearsky_BSRN_quantreg_eval.r
 
+library(knitr)
+
+
+#### I cannot install devtools on Rstudio server version
+# install.packages("devtools")
+# library(devtools)
+# install_github("laubblatt/phaselag")
+source("~/bgc/github/laubblatt/phaselag/R/data.table.regression.utils.R")
 
 
 pdat = "/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/"
@@ -18,6 +26,8 @@ setkey(qr30yrmon,SiteCode,year,month)
 compare4package = merge(qr30yrmon, dtyrmon[ , .(SiteCode,year,month, ftau85dt30)])
 xyplot(ftau ~ ftau85dt30 | SiteCode, data  = compare4package)
 compare4package[abs(ftau - ftau85dt30) > 0.01,   ]
+xyplot(ftau ~ ftau85dt30, data  = compare4package[abs(ftau - ftau85dt30) > 0.01,   ])
+
 # SiteCode year month IncomingShortwave IncomingShortwavePotential      ftau IncomingShortwaveClearSky Window  tau ftau85dt30
 # 1:      ALE 2008     3         29.470228                  26.684923 0.9912509                 26.451453   3mon 0.85  1.0141337
 # 2:      ALE 2010    10          2.350706                   2.733753 0.8630349                  2.359324   3mon 0.85  0.8769211
@@ -42,93 +52,57 @@ compare4package[abs(ftau - ftau85dt30) > 0.01,   ]
 # 21:      SPO 1996     9          8.080520                   4.150829 1.0600444                  4.400063   3mon 0.85  1.1104346
 # 22:      SPO 1997     9          5.000876                   3.004640 1.1352014                  3.410871   3mon 0.85  1.1508503
 
+########################
+#### data submission 
+ClearSky_BSRN_monthly = dtyrmon[! is.na(Rsdpot_12) , .(SiteCode, year, month, IncomingShortwave, 
+             IncomingShortwavePotential = Rsdpot_12, beta_qr = ftau85dt30, IncomingShortwaveClearSky, IncomingShortwaveClearSky_LA2000 = Swclidnz)]
+
+write.table(format(ClearSky_BSRN_monthly, digits=2), file = paste0(prdata,"ClearSky_BSRN_monthly.tab"), sep = "\t", row.names = FALSE, quote = FALSE)
+
 ##################################################
 #### START EVALUATION CODE #####
-load(file = paste0(prdata,"dtyrmon.rdata"))
+#### this needs to merge with the dtclearsky data to get the Long and Ackerman data 
+
+list.files(pdat)
+(BSRNclearsky  = fread(paste0(pdat, "dataETHZ/CSW_mm_Swclidnz_nighttime0_201709.dat"), na.strings = "-999.9") )
+setnames(BSRNclearsky, c("V1","V2", "V15"), c("site", "year", "annual") )
+BSRNclearsky[ , SiteCode := toupper(site)]
+
+dtclearsky =  melt.data.table(BSRNclearsky, id.vars = c("SiteCode", "year", "site") , value.name = "Swclidnz" )
+dtclearsky[ , month := as.numeric(substr(variable,2,4)) - 2]
+dtclearsky[, variable := NULL]
+dtclearsky[, site := NULL]
+setkey(dtclearsky,SiteCode, year, month)
+dtclearsky
+
+dt30yrmon =  merge( qr30yrmon, dtclearsky)
+dt60yrmon =  merge( qr60yrmon, dtclearsky, by = c("SiteCode","year", "month"))
+
+dt30yrmon[ ,  ftau_LA2000 := Swclidnz/IncomingShortwavePotential]
+dt30yrmon[ , SWCRE_QR := IncomingShortwave - IncomingShortwaveClearSky]
 
 #### calc a skill score ####
-## reduction in variance depends here on the choice of potential radiation
-#' with Rsdpot_12 the improvement is really good with 0.63
-#' with Rsdpot_tzlon the improvemnt is less strong 0.33 (due to high bias of high values - with lower slope)
-dtyrmon[ , MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = Rsdpot_tzlon* 0.74 )]
-dtyrmon[ , MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = Rsdpot_12* 0.81 )]
+dt30yrmon[ , MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = IncomingShortwavePotential  * 0.81 )]
 # [1] 0.718883
-# xyplot(Swclidnz + IncomingShortwaveClearSky + IncomingShortwave ~ I(year+month/12), data = dtyrmon[SiteCode == "DAA", ], type = "b")
-# xyplot(Rsdpot_12 + IncomingShortwave ~ Time | Date, data = dt30[SiteCode == "DAA" & year(Date) == 2005, ])
+# xyplot(Swclidnz + IncomingShortwaveClearSky + IncomingShortwave ~ I(year+month/12), data = dt30yrmon[SiteCode == "DAA", ], type = "b")
+# xyplot(IncomingShortwavePotential + IncomingShortwave ~ Time | Date, data = dt30[SiteCode == "DAA" & year(Date) == 2005, ])
 
-(dtyrmon_skill =  dtyrmon[ , .(SSMSE =  MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = Rsdpot_12* 0.81 ),
+(dt30yrmon_skill =  dt30yrmon[ , .(SSMSE =  MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = IncomingShortwavePotential* 0.81 ),
                                .N, RMSE = rmse(o = Swclidnz, p = IncomingShortwaveClearSky), r = cor(Swclidnz, IncomingShortwaveClearSky, use = "pair")  ), by = SiteCode][order(SSMSE),])
-# SiteCode       SSMSE   N      RMSE         r
-# 1:      XIA -3.82237703 112 21.056843 0.9859674
-# 2:      DAA -3.22278363  49 17.220763 0.9892442
-# 3:      CAM -1.85801732 117  5.412201 0.9989457
-# 4:      TAT -0.48837120 231 12.451644 0.9953084
-# 5:      TAM -0.45720561 184 15.105426 0.9901848
-# 6:      SMS -0.41623940  28 12.524844 0.9983298
-# 7:      ASP -0.35928579 234  9.651066 0.9982302
-# 8:      ILO -0.08862025  88 29.230239 0.6948924
-# 9:      BER -0.03514962 251  6.021890 0.9971641
-# 10:      SOV  0.13351846  51  9.181851 0.9919265
-# 11:      CAB  0.24796749 127  6.739249 0.9990970
-# 12:      LIN  0.30093352 151  6.876834 0.9984622
-# 13:      EUR  0.30280588  34 15.268946 0.9951386
-# 14:      LER  0.32398928 107  4.435739 0.9989626
-# 15:      PAL  0.34472895 124  6.381419 0.9984396
-# 16:      SBO  0.41621926 117  7.972475 0.9983444
-# 17:      PAY  0.47563625 224  5.766805 0.9987339
-# 18:      BON  0.52707353 174  7.667953 0.9968057
-# 19:      CNR  0.52886768  58  7.071625 0.9972920
-# 20:      BRB  0.54510561  70 18.473882 0.9728482
-# 21:      BIL  0.55733564 223  7.934127 0.9961900
-# 22:      CAR  0.56107766 225  6.090273 0.9993170
-# 23:      COC  0.57239313 104  6.336584 0.9884929
-# 24:      FUA  0.57936158  64  8.162267 0.9982406
-# 25:      SAP  0.60306013  64  6.661646 0.9980227
-# 26:      TOR  0.61162169 200  5.643541 0.9990121
-# 27:      PSU  0.62079029 132  7.147440 0.9977000
-# 28:      LAU  0.65768947 181  6.466766 0.9985194
-# 29:      DRA  0.65779009 136  8.743672 0.9986435
-# 30:      ISH  0.65899170  64  9.162988 0.9894568
-# 31:      KWA  0.70713220 266  8.328495 0.9173314
-# 32:      FPE  0.70733481 173  7.729039 0.9978729
-# 33:      FLO  0.72642860 157  6.500144 0.9966585
-# 34:      GCR  0.74267098 174  7.042092 0.9957670
-# 35:      NAU  0.76711209 179  6.632151 0.8940744
-# 36:      TIK  0.78161555  41  5.459848 0.9989823
-# 37:      SXF  0.78228981  73  6.224599 0.9986526
-# 38:      ALE  0.79910397  72 10.091215 0.9947139
-# 39:      E13  0.80115873 213  5.321181 0.9984482
-# 40:      BOU  0.80404448 283  7.547354 0.9976535
-# 41:      BAR  0.82893960 155  6.404286 0.9987786
-# 42:      CLH  0.85424657 183  4.606143 0.9982793
-# 43:      PTR  0.86172918  77  9.577888 0.9565705
-# 44:      DAR  0.86874915 149  6.804433 0.9841611
-# 45:      MAN  0.87535052 204  5.764555 0.9489322
-# 46:      REG  0.87686355 203  5.253363 0.9992353
-# 47:      MNM  0.89856274  64  3.467268 0.9983637
-# 48:      BOS  0.90611894 167  5.047253 0.9988856
-# 49:      NYA  0.95430752 179  3.141172 0.9989329
-# 50:      DOM  0.95511090  38 13.801033 0.9989654
-# 51:      SPO  0.96441240  40 11.478256 0.9995312
-# 52:      SYO  0.96770258 201  6.091772 0.9991277
-# 53:      GVN  0.97344028 204  6.213640 0.9990839
-# 54:      IZA  0.98614502  78  3.946603 0.9989020
-# SiteCode       SSMSE   N      RMSE         r
-
 
 #### Monthly mean statistics reported in text ####
 #' @update 20181213 remove condition of R1 in stats
 (ymon_Rsdcs_lmstats = dcast(
-  dtyrmon[ , mlm.output.statlong.call(IncomingShortwaveClearSky~Swclidnz, .SD), by = SiteCode]
+  dt30yrmon[ , mlm.output.statlong.call(IncomingShortwaveClearSky~Swclidnz, .SD), by = SiteCode]
   , ... ~ statistic))
 
 ## NAIVE estimate using a fixed fration of Rsdpot (may need a skill score)
 (ymon_Rsdpotcs_lmstats = dcast(
-  dtyrmon[ , mlm.output.statlong.call(I(Rsdpot_12 * 0.81) ~Swclidnz, .SD), by = SiteCode]
+  dt30yrmon[ , mlm.output.statlong.call(I(IncomingShortwavePotential * 0.81) ~Swclidnz, .SD), by = SiteCode]
   , ... ~ paste0("Rsdpot_",statistic)) )
-ymon_Rsdpotcs_rmse = dtyrmon[ , .(Rsdpot_RMSE = rmse(I(Rsdpot_12 * 0.81), Swclidnz)) , by = SiteCode]
+ymon_Rsdpotcs_rmse = dt30yrmon[ , .(Rsdpot_RMSE = rmse(I(IncomingShortwavePotential * 0.81), Swclidnz)) , by = SiteCode]
 
-ymon_Rsdcs_rmse = dtyrmon[ , .(RMSE = rmse(IncomingShortwaveClearSky, Swclidnz)) , by = SiteCode]
+ymon_Rsdcs_rmse = dt30yrmon[ , .(RMSE = rmse(IncomingShortwaveClearSky, Swclidnz)) , by = SiteCode]
 ymon_Rsdcs_lmstats =  merge(ymon_Rsdcs_lmstats,ymon_Rsdcs_rmse)
 
 ymon_Rsdcs_lmstats[abs(slope1 - 1) < 0.1 & R2 > 0.95  , .(.N, range(slope1), range(R2), range(RMSE))]
@@ -146,49 +120,43 @@ ymon_Rsdcs_lmstats[order(R2), .(SiteCode,  RMSE, R2)]
 ### annual series and potential trends #####
 ## for high latitude sites with low winter values no missing values should be allowed !
 ## needs a grouping of sites to plot this
-# dtyr =  dtyrmon[ , lapply(.SD, meann, nmin = 11, na.rm = TRUE),  by = list(SiteCode, year)]
-# dtyr =  dtyrmon[ , lapply(.SD, base::mean),  by = list(SiteCode, year)]
+# dtyr =  dt30yrmon[ , lapply(.SD, meann, nmin = 11, na.rm = TRUE),  by = list(SiteCode, year)]
+# dtyr =  dt30yrmon[ , lapply(.SD, base::mean),  by = list(SiteCode, year)]
 # dtsite =  dtyr[ , lapply(.SD, meann, nmin = 2, na.rm = TRUE) ,  by = list(SiteCode)]
 
 ## IMPORTANT only use pairs of data of both data sets and remove strange values of QR
 
-dtyrmon[   !is.na(IncomingShortwaveClearSky - Swclidnz), ]
-dtyrmon[!is.na(IncomingShortwave)  &  !is.na(IncomingShortwaveClearSky - Swclidnz), ]
-dtyr =  dtyrmon[!is.na(IncomingShortwave)  &  !is.na(IncomingShortwaveClearSky - Swclidnz), lapply(.SD, base::mean),  by = list(SiteCode, SiteName, year)]
+dt30yrmon[   !is.na(IncomingShortwaveClearSky - Swclidnz), ]
+dt30yrmon[!is.na(IncomingShortwave)  &  !is.na(IncomingShortwaveClearSky - Swclidnz), ]
+dtyr =  dt30yrmon[!is.na(IncomingShortwave)  &  !is.na(IncomingShortwaveClearSky - Swclidnz), lapply(.SD, base::mean),  by = list(SiteCode,year)]
 dtyr
-dtsite =  dtyr[ , lapply(.SD, meann, nmin = 2, na.rm = TRUE) ,  by = list(SiteCode, SiteName)]
+dtsite =  dtyr[ , lapply(.SD, meann, nmin = 2, na.rm = TRUE) ,  by = list(SiteCode)]
 dtsite
-dtsite[ , SiteName ]
 dtsite[ , .(  rmse(IncomingShortwaveClearSky, Swclidnz), cor(IncomingShortwaveClearSky, Swclidnz)^2 )]
-# V1        V2
-# 1: 6.097866 0.9894707
 setkey(dtsite,SiteCode)
 
-(dtsiteregSWcs = dcast(dtyrmon[ , mlm.output.statlong.call("IncomingShortwaveClearSky ~ Swclidnz", data = .SD), by = list(SiteCode)], SiteCode ~ paste0("SWcsreg_",statistic)) )
+(dtsiteregSWcs = dcast(dt30yrmon[ , mlm.output.statlong.call("IncomingShortwaveClearSky ~ Swclidnz", data = .SD), by = list(SiteCode)], SiteCode ~ paste0("SWcsreg_",statistic)) )
 
-(dtsiteRMSESWcs = dtyrmon[ , .(RMSE_Rsdcs = rmse(IncomingShortwaveClearSky,Swclidnz) ), by = list(SiteCode)])
+(dtsiteRMSESWcs = dt30yrmon[ , .(RMSE_Rsdcs = rmse(IncomingShortwaveClearSky,Swclidnz) ), by = list(SiteCode)])
 
-(dtsiteregtault1 = dcast(dtyrmon[ftau85dt30 < 1 & ftau_LA2000 < 1,  mlm.output.statlong.call("ftau85dt30 ~ ftau_LA2000", data = .SD), by = list(SiteCode)], SiteCode ~ paste0("tault1reg_",statistic)) )
+(dtsiteregtault1 = dcast(dt30yrmon[ftau < 1 & ftau_LA2000 < 1,  mlm.output.statlong.call("ftau ~ ftau_LA2000", data = .SD), by = list(SiteCode)], SiteCode ~ paste0("tault1reg_",statistic)) )
 
 
 dtsitestats =  merge(dtsite,dtsiteregSWcs)
 dtsitestats =  merge(dtsitestats,dtsiteRMSESWcs)
 dtsitestats =  merge(dtsitestats,dtsiteregtault1)
 
-
 ### Order sites by their cloud effects
-dtsite[ , .(SiteCode,lat,ftau85dt30, SWCRE_QR, fCRE = SWCRE_QR/IncomingShortwave)][order(fCRE),]
-dtsite[ , .(SiteCode,lat,ftau85dt30, SWCRE_QR, fCRE = SWCRE_QR/IncomingShortwaveClearSky  )][order(SWCRE_QR),]
-dtsite[ , .(SiteCode,SiteName,round(lat,1),ftau85dt30, SWCRE_QR, fCRE = SWCRE_QR/IncomingShortwaveClearSky  )][order(fCRE),]
+dtsite[ , .(SiteCode,ftau, SWCRE_QR, fCRE = SWCRE_QR/IncomingShortwave)][order(fCRE),]
+dtsite[ , .(SiteCode,ftau, SWCRE_QR, fCRE = SWCRE_QR/IncomingShortwaveClearSky  )][order(SWCRE_QR),]
 
 ### SiteTable ####
 colnames(dtsitestats)
-dtsitestats[ , Location := NULL]
-dtsitestats = merge(dtsitestats,BSRNStationMeta[, .(SiteCode,Location)])
-(dtsitestats_print =  dtsitestats[ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(lon,1), Lat = round(lat,1),
+dtsitestats = merge(dtsitestats,BSRNStationMeta[, .(SiteCode,Location,SiteName,Longitude,Latitude)])
+(dtsitestats_print =  dtsitestats[ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(Longitude,1), Lat = round(Latitude,1),
                                        Rsd = round(IncomingShortwave), Rsdcs_QR = round(IncomingShortwaveClearSky), Rsdcs_LA = round(Swclidnz),
                                        RMSE = round(RMSE_Rsdcs,1),  
-                                       beta_QR = round(ftau85dt30,2), beta_LA = round(ftau_LA2000,2),
+                                       beta_QR = round(ftau,2), beta_LA = round(ftau_LA2000,2),
                                        R2 =  round(tault1reg_R2,2), slope = round(tault1reg_slope1,2), n = SWcsreg_n, fCRE = round(-SWCRE_QR/IncomingShortwaveClearSky,2)  )][order(SiteCode),])
 dtsitestats[ , .(SWcsreg_n, tault1reg_n)]
 
@@ -319,13 +287,13 @@ dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][abs(SWc
 
 
 #### get clear sky days ####
-# dtyrmon[20 , paste(year,month,1, sep = "-")]
-# dtyrmon[ , Date := as.IDate(paste(year,month,1, sep = "-"), format = "%Y-%m-%d")]
+# dt30yrmon[20 , paste(year,month,1, sep = "-")]
+# dt30yrmon[ , Date := as.IDate(paste(year,month,1, sep = "-"), format = "%Y-%m-%d")]
 dt30[ , year := year(Date)]
 dt30[ , month := month(Date)]
-mdt30 = merge(dt30, dtyrmon[ , list(SiteCode,year, month, ftau85dt30, ftau_LA2000, dt30rq085_slope1, dt30rq085_R1, SiteName)],
+mdt30 = merge(dt30, dt30yrmon[ , list(SiteCode,year, month, ftau85dt30, ftau_LA2000, dt30rq085_slope1, dt30rq085_R1, SiteName)],
               by = c("SiteCode", "year", "month"))
-mdt30[, IncomingShortwaveClearSky := ftau85dt30 * Rsdpot_12]
+mdt30[, IncomingShortwaveClearSky := ftau85dt30 * IncomingShortwavePotential]
 mdt30[ , SWCRE_QR := IncomingShortwave - IncomingShortwaveClearSky]
 
 ### aggregate 30min values to full days, do not allow missing values  ####
