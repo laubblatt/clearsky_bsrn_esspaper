@@ -1,9 +1,9 @@
-#' Perform Quantile Regression runs on (half-)hourly BSRN data 
-#' 
+#' Perform Quantile Regression runs on (half-)hourly BSRN data
+#'
 #' @filename clearsky_BSRN_quantreg.r
-#' @version 2019-08-26 copied stuff from M44_BSRN_hourly_quantreg_85.r for public access 
-#' 
-#' @TODO which source scripts are really required?  
+#' @version 2019-08-26 copied stuff from M44_BSRN_hourly_quantreg_85.r for public access
+#'
+#' @TODO which source scripts are really required?
 
 ##' packages ----
 library(quantreg)
@@ -11,6 +11,7 @@ library(lubridate)
 library(data.table)
 library(parallel)
 
+library(lattice)
 
 #### I cannot install devtools on Rstudio server version
 # install.packages("devtools")
@@ -33,7 +34,7 @@ if (is.element(unlist(si[[4]]), c("konya-ubuntu","birne","quillotavbox"))) {
   prdata <- "~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/rdata/"
   pdat <- "~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/"
 }  else {
-  
+
   pdat = "/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/"
   prdata = "~/bgc/gitbgc/clearsky_bsrn_esspaper/rdata/"
   pfig = "~/bgc/gitbgc/clearsky_bsrn_esspaper/figures/"
@@ -96,6 +97,7 @@ dt30[nyrmon > 2*24*26,]
 dt30[  , nyrmon_Rp10 := sum(!is.na(IncomingShortwave) & Rsdpot_12 > 10) , by = list(SiteCode, year(Date), month(Date))]
 # xyplot(nyrmon_Rp10 ~ I(month(Date)) | SiteCode, data = dt30[SiteCode %in% c("SPO","LIN","GVN"), ])
 dt30[nyrmon_Rp10 > 100,]
+dt30[nyrmon_Rp10 <= 100,]
 
 #### AGGREGATE TO MONTHLYdiurnal cylce with 26 days required and then average the monthly mean diurnal cycle ####
 dtyrmondiurnal = dt30[ , lapply(.SD, meann, nmin = 26, na.rm = TRUE),  by = list(SiteCode, year(Date), month(Date), Time)]
@@ -111,7 +113,7 @@ setkey(dt30, "SiteCode")
 system.time(
   resultstau <- mclapply( unique(dt30[[ "SiteCode"]]),
                           function(x) {
-                            dt30[ .(x), ][ nyrmon_Rp10 > 100, 
+                            dt30[ .(x), ][ nyrmon_Rp10 > 100,
                                            mlm.output.statlong.call.rq("IncomingShortwave ~ Rsdpot_12",
                                                                   data = .SD, tau = seq(0.7,0.99,0.01)),
                                            by = list(SiteCode, year(Date), month(Date))]
@@ -131,20 +133,53 @@ dtyrmontau[ , IncomingShortwaveClearSky :=   dt30rq_slope1 * Rsdpot_12]
 
 save(dtyrmontau, file = paste0(prdata,"dtyrmontau.rdata"))
 
-### run per site with windowing 
-system.time( 
-qryrmon <- dt30[ , calc_ClearSky_QuantileRegression_MonthlyTimeWindow(Date = Date,
+### run per site with windowing
+system.time(
+qr30yrmon <- dt30[nyrmon_Rp10 > 100 , calc_ClearSky_QuantileRegression_MonthlyTimeWindow(Date = Date,
                            Time = Time, IncomingShortwave = IncomingShortwave,
                            IncomingShortwavePotential = Rsdpot_12,
                            mc.cores = 10,tau = 0.85, pdev = 0.25), by = SiteCode]
 )
 
-Error in `[.data.table`(dth, , calc_ClearSky_QuantileRegression(IncomingShortwave,  : 
-                                                                  j doesn't evaluate to the same number of columns for each group
-6
- `[.data.table`(dth, , calc_ClearSky_QuantileRegression(IncomingShortwave, 
-    IncomingShortwavePotential, tau), by = list(year(Date), month(Date))) at
- ClearSkyQuantileRegression.R#155
-5                                                                
+qr30yrmon
+
+# Error in `[.data.table`(dth, , calc_ClearSky_QuantileRegression(IncomingShortwave,  :
+#                                                                   j doesn't evaluate to the same number of columns for each group
+#
+# [.data.table`(dth, , calc_ClearSky_QuantileRegression(IncomingShortwave,
+#     IncomingShortwavePotential, tau), by = list(year(Date), month(Date))) at
+#  ClearSkyQuantileRegression.R#155
+
+
+
+load(file = paste0(prdata,"BSRN_dt60.rdata"))
+dt60 = merge(dt60, BSRNmeta[ , list(SiteCode, lat, lon) ], by = "SiteCode", all.x = TRUE)
+
+dt60[ , Rsdpot_12 := calc_PotRadiation_CosineResponsePower(doy = yday(Date), hour = Time/3600 + 0.5,
+                                                           latDeg = lat ,
+                                                           longDeg = lon,
+                                                           timeZone = 0, isCorrectSolartime = TRUE,
+                                                           cosineResponsePower = 1.2 )]
+
+dt60[  , nyrmon_Rp10 := sum(!is.na(IncomingShortwave) & Rsdpot_12 > 10) , by = list(SiteCode, year(Date), month(Date))]
+
+system.time(
+  qr60yrmon <- dt60[nyrmon_Rp10 > 50 , calc_ClearSky_QuantileRegression_MonthlyTimeWindow(Date = Date,
+                                                                        Time = Time, IncomingShortwave = IncomingShortwave,
+                                                                        IncomingShortwavePotential = Rsdpot_12,
+                                                                        mc.cores = 10,tau = 0.85, pdev = 0.25), by = SiteCode]
+)
+# User      System verstrichen
+# 1110.047     203.410     652.234
+qr60yrmon
+warnings()
+
+library(latticeExtra)
+xyplot(ftau ~ I(year + month/12) | SiteCode, data = qr60yrmon[!is.na(Window) ,], type = "l") +
+  xyplot(ftau ~ I(year + month/12) | SiteCode, data = qr30yrmon[!is.na(Window) ,], type = "l", col = 2)
+
+
+
+
 
 
