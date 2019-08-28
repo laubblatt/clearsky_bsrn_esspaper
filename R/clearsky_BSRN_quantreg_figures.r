@@ -29,9 +29,9 @@
 
 
 ##' packages ----
-library(tidyverse)
+# library(tidyverse)
 library(knitr)
-library(kableExtra)
+# library(kableExtra)
 library(data.table)
 library(latticeExtra)
 library(quantreg)
@@ -143,7 +143,11 @@ dtclearsky
 
 
 #### load data 
-load(paste0(prdata,"BSRN_dt30.rdata"))
+# load(paste0(prdata,"BSRN_dt30.rdata"))
+
+load(file = paste0(prdata,"qr30yrmon.rdata"))
+load(file = paste0(prdata,"qr60yrmon.rdata"))
+
 
 ##################################################
 #### this will merge with the dtclearsky data to get the Long and Ackerman data 

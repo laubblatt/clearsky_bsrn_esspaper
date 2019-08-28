@@ -10,6 +10,7 @@
 #'       Earth and Space Science, 2019.
 #'       \url{https://doi.org/10.1029/2019EA000686}
 
+#' @TODO clean up poor sites code in bottom 
 #' 
 
 library(data.table)
@@ -169,4 +170,151 @@ dtsitestats =  merge(dtsitestats,dtsiteregtault1)
 ### Order sites by their cloud effects
 dtsite[ , .(SiteCode,ftau, SWCRE_QR, fCRE = SWCRE_QR/IncomingShortwave)][order(fCRE),]
 dtsite[ , .(SiteCode,ftau, SWCRE_QR, fCRE = SWCRE_QR/IncomingShortwaveClearSky  )][order(SWCRE_QR),]
+
+### SiteTable ####
+colnames(dtsitestats)
+dtsitestats = merge(dtsitestats,BSRNStationMeta[, .(SiteCode,Location,SiteName,Longitude,Latitude)])
+(dtsitestats_print =  dtsitestats[ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(Longitude,1), Lat = round(Latitude,1),
+                                       Rsd = round(IncomingShortwave), Rsdcs_QR = round(IncomingShortwaveClearSky), Rsdcs_LA = round(Swclidnz),
+                                       RMSE = round(RMSE_Rsdcs,1),  
+                                       beta_QR = round(ftau,2), beta_LA = round(ftau_LA2000,2),
+                                       R2 =  round(tault1reg_R2,2), slope = round(tault1reg_slope1,2), n = SWcsreg_n, fCRE = round(-SWCRE_QR/IncomingShortwaveClearSky,2)  )][order(SiteCode),])
+dtsitestats[ , .(SWcsreg_n, tault1reg_n)]
+
+library(dplyr)
+library(kableExtra)
+
+dtsitestats_print_bold = dtsitestats_print%>%
+  mutate(R2 = cell_spec(R2, bold = T) )%>%
+  kable(escape = F)
+dtsitestats_print_bold
+cat(dtsitestats_print_bold, sep = "\n", file = paste0(pfig,"dtsitestats_print_bold.html"))
+
+cat(kable(dtsitestats_print_bold, format = "html"), sep = "\n", file = paste0(pfig,"dtsitestats_print_bold.html"))
+
+
+
+#### calculate the 60-60 average beta ####
+dtsite[ , .(.N, mean(ftau))]
+# N        V2
+# 1: 54 0.8375215
+dtsitestats[ abs(Latitude) <= 60 , .(.N, mean(ftau))]
+# N        V2
+# 1: 44 0.8127061
+
+dtsitestats_print_bold = dtsitestats_print%>%
+  mutate(R2 = cell_spec(R2, bold = T) )%>%
+  kable(escape = F)
+dtsitestats_print_bold
+cat(dtsitestats_print_bold, sep = "\n", file = paste0(pfig,"dtsitestats_print_bold.html"))
+
+cat(kable(dtsitestats_print_bold, format = "html"), sep = "\n", file = paste0(pfig,"dtsitestats_print_bold.html"))
+
+
+library(tidyverse)
+
+df <- data.frame(char = c('a','b','c'),
+                 num = c(1,2,3))
+
+df %>%
+  format_cells(1, 1, "italics") %>%
+  format_cells(2, 2, "bold") %>%
+  format_cells(3, 1:2, "strikethrough") %>%
+  knitr::kable()
+
+
+### @TODO this need checking again 
+
+sitespoorLAhighlat = c("ALE","BAR", "DOM", "EUR", "SPO", "SYO")
+sitespoorLAtrop = c("COC","ISH", "KWA", "MAN", "NAU")
+sitespoorother = c("ILO", "TAM", "PTR", "BRB", "XIA")
+sitespoorcloudymarine = c("LER","CAM")
+sitespoor = c(sitespoorother,sitespoorLAtrop,sitespoorLAhighlat, sitespoorcloudymarine)
+
+dtsitestats[ !(SiteCode %in%  sitespoor),  ]
+dtsitestats[ !(SiteCode %in%  sitespoor),  ][, range(tault1reg_R2) ]
+
+dtsitestats[order(tault1reg_R2), .(SiteCode,tault1reg_R2, tault1reg_slope1, RMSE_Rsdcs, SiteCode %in%  sitespoor, tault1reg_slope1_pvalue<0.01)]
+
+dtsitestats[ !(SiteCode %in%  sitespoor),  ][order(tault1reg_R2), .(SiteCode,tault1reg_R2, tault1reg_slope1)]
+dtsitestats[ !(SiteCode %in%  sitespoor),  ][, range(RMSE_Rsdcs) ]
+
+
+dtsitestats[ !(SiteCode %in%  sitespoor),  ][, range(SWcsreg_slope1) ]
+
+dtsitestats[ !(SiteCode %in%  sitespoor),  ][order(SWcsreg_R2) , .(SiteCode, SWcsreg_R2)]
+
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ]
+
+sitespoorQR = c("TAM","ILO", "PTR", "BRB", "DAA", "XIA")
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat,sitespoorQR)),  ][, range(SWcsreg_R2) ]
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat,sitespoorQR)),  ][, range(RMSE_Rsdcs) ]
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs < 8, range(SWcsreg_slope1) ]
+
+
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][SWcsreg_slope1 > 1.05,  ][ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(lon,1), Lat = round(lat,1),
+                                                                                                        Rsd = round(IncomingShortwave), Rsdcs_QR = round(IncomingShortwaveClearSky), Rsdcs_LA = round(Swclidnz),
+                                                                                                        RMSE = round(RMSE_Rsdcs,1), R2 =  round(SWcsreg_R2,3), slope = round(SWcsreg_slope1,2), n = SWcsreg_n,
+                                                                                                        beta_QR = round(ftau85dt30,2), beta_LA = round(ftau_LA2000,2), fCRE = round(-SWCRE_QR/IncomingShortwaveClearSky,2)  )][order(SiteCode),]
+
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs < 8,  ][ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(lon,1), Lat = round(lat,1),
+                                                                                                 Rsd = round(IncomingShortwave), Rsdcs_QR = round(IncomingShortwaveClearSky), Rsdcs_LA = round(Swclidnz),
+                                                                                                 RMSE = round(RMSE_Rsdcs,1), R2 =  round(SWcsreg_R2,3), slope = round(SWcsreg_slope1,2), n = SWcsreg_n,
+                                                                                                 beta_QR = round(ftau85dt30,2), beta_LA = round(ftau_LA2000,2), fCRE = round(-SWCRE_QR/IncomingShortwaveClearSky,2)  )][order(SiteCode),]
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs < 8, range(SWcsreg_R2) ]
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs < 8, range(SWcsreg_slope1) ]
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs > 15,  ][ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(lon,1), Lat = round(lat,1),
+                                                                                                  Rsd = round(IncomingShortwave), Rsdcs_QR = round(IncomingShortwaveClearSky), Rsdcs_LA = round(Swclidnz),
+                                                                                                  RMSE = round(RMSE_Rsdcs,1), R2 =  round(SWcsreg_R2,3), slope = round(SWcsreg_slope1,2), n = SWcsreg_n,
+                                                                                                  beta_QR = round(ftau85dt30,2), beta_LA = round(ftau_LA2000,2), fCRE = round(-SWCRE_QR/IncomingShortwaveClearSky,2)  )][order(slope),]
+
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][SWcsreg_R2 < 0.97,  ][ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(lon,1), Lat = round(lat,1),
+                                                                                                    Rsd = round(IncomingShortwave), Rsdcs_QR = round(IncomingShortwaveClearSky), Rsdcs_LA = round(Swclidnz),
+                                                                                                    RMSE = round(RMSE_Rsdcs,1), R2 =  round(SWcsreg_R2,3), slope = round(SWcsreg_slope1,2), n = SWcsreg_n,
+                                                                                                    beta_QR = round(ftau85dt30,2), beta_LA = round(ftau_LA2000,2), fCRE = round(-SWCRE_QR/IncomingShortwaveClearSky,2)  )][order(slope),]
+
+
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs < 15, range(SWcsreg_R2) ]
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs < 8, range(SWcsreg_slope1) ]
+
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][RMSE_Rsdcs > 10,  ]
+
+dtsitestats[ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][abs(SWcsreg_slope1-1) > 0.05,  ][ , .(SiteCode,"Site Name" = substr(SiteName,1,12),Location, Lon = round(lon,1), Lat = round(lat,1),
+                                                                                                               Rsd = round(IncomingShortwave), Rsdcs_QR = round(IncomingShortwaveClearSky), Rsdcs_LA = round(Swclidnz),
+                                                                                                               RMSE = round(RMSE_Rsdcs,1), R2 =  round(SWcsreg_R2,3), slope = round(SWcsreg_slope1,2), n = SWcsreg_n,
+                                                                                                               beta_QR = round(ftau85dt30,2), beta_LA = round(ftau_LA2000,2), fCRE = round(-SWCRE_QR/IncomingShortwaveClearSky,2)  )][order(SiteCode),]
+
+
+#### get clear sky days ####
+# dt30yrmon[20 , paste(year,month,1, sep = "-")]
+# dt30yrmon[ , Date := as.IDate(paste(year,month,1, sep = "-"), format = "%Y-%m-%d")]
+dt30[ , year := year(Date)]
+dt30[ , month := month(Date)]
+mdt30 = merge(dt30, dt30yrmon[ , list(SiteCode,year, month, ftau85dt30, ftau_LA2000, dt30rq085_slope1, dt30rq085_R1, SiteName)],
+              by = c("SiteCode", "year", "month"))
+mdt30[, IncomingShortwaveClearSky := ftau85dt30 * IncomingShortwavePotential]
+mdt30[ , SWCRE_QR := IncomingShortwave - IncomingShortwaveClearSky]
+
+### aggregate 30min values to full days, do not allow missing values  ####
+#' @update 2018-12-14 use 30min values for daily avgs
+# mdtday = mdt60[ , lapply(.SD, meann, nmin = 24, na.rm = FALSE),  by = list(SiteCode, Date)]
+mdtday = mdt30[ , lapply(.SD, base::mean, na.rm = FALSE),  by = list(SiteCode, Date)]
+mdtday[ , Rsd2Rsdpot := IncomingShortwave/IncomingShortwaveClearSky ]
+mdtday[ , Rsd2Rsdpot_cut := cut(Rsd2Rsdpot, seq(0,1.2,0.1))]
+
+mdtday[ , year := NULL]
+mdtday[ , month := NULL]
+mdtday[ , SiteName := NULL]
+save(mdtday, file = paste0(prdata,"mdtday.rdata"))
+
 
