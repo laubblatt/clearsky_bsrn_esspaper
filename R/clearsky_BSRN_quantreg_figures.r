@@ -33,8 +33,9 @@
 
 ##' packages ----
 # library(tidyverse)
+library(dplyr)
 library(knitr)
-# library(kableExtra)
+library(kableExtra)
 library(data.table)
 library(latticeExtra)
 library(quantreg)
@@ -67,7 +68,7 @@ if (inherits(try(library(phaselag)),"try-error") ) {
 # install.packages("devtools")
 # library(devtools)
 # install_github("laubblatt/cleaRskyQunatileRegression")
-library(cleaRskyQuantileRegression)
+# library(cleaRskyQuantileRegression)
 if (inherits(try(library(cleaRskyQuantileRegression)),"try-error") ) { 
   print("library cleaRskyQuantileRegression not available, use source instead")
   source("~/bgc/gitbgc/clearskyquantileregression/R/PotentialRadiation.R")
@@ -283,10 +284,13 @@ lab_Rsdcs      = expression(bold("Clear-sky shortwave radiation "*R['sd,cs']*" "
 labhourday = expression(bold("Hour of day (UTC)"))
 #### ILLUS QR ##### 
 #### Figure 1 Illus QR #####
-sico = "LIN"
-dt30 = merge(dt30, BSRNStationMeta[ , list(SiteCode, lat = Latitude, lon = Longitude) ], by = "SiteCode", all.x = TRUE)
 
-(dat = dt30[SiteCode == sico & year(Date) == 2003 & month(Date) == 8, ])
+data("LIN2003")
+sico = "LIN"
+LIN2003[ , lat := BSRNStationMeta[SiteCode == sico , Latitude]]
+LIN2003[ , lon := BSRNStationMeta[SiteCode == sico , Longitude]]
+LIN2003
+(dat = LIN2003[ year(Date) == 2003 & month(Date) == 8, ])
 
 dat[ , Rsdpot_12 := calc_PotRadiation_CosineResponsePower(doy = yday(Date), hour = Time/3600 + 0.25,
                                                            latDeg = lat ,
@@ -340,7 +344,6 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 dt30yrmon[LA2000ok == TRUE , rmse(Swclidnz, IncomingShortwaveClearSky)]
 # [1] 8.600331 ## reported in text ###
 
-MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = Rsdpot_12* 0.81 )
 dt30yrmon[LA2000ok == TRUE , MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = IncomingShortwavePotential* 0.81 )]
 # 0.7396669  reduction in residual variance by 74% reportent in text 
 
@@ -361,7 +364,7 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 ### show the improvement against a fixed fraction estimate
 (gname = paste(pfig,"BSRN_Rsdcs_diff_LA2000_ref_monthly.pdf",sep=""))
 pdf(gname,6,6)
-xyplot( I(IncomingShortwavePotential * 0.81 - Swclidnz)  + I(IncomingShortwaveClearSky - Swclidnz) ~ Swclidnz, data = dtyrmon,
+xyplot( I(IncomingShortwavePotential * 0.81 - Swclidnz)  + I(IncomingShortwaveClearSky - Swclidnz) ~ Swclidnz, data = dt30yrmon,
         pch = ".", cex = 2,
         xlab = expression(bold("Clear-sky global radiation, Standard method ")(W*m^-2) ),
         ylab = expression(bold("Difference to Standard method ")(W*m^-2) ),
@@ -374,14 +377,14 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 #### Figure 8 updated with a marginal distribution of the residuals 
 (gname = paste(pfig,"BSRN_Rsdcs_diff_LA2000_ref_monthly_margdens.pdf",sep=""))
 pdf(gname,7.8,5)
-densref = dtyrmon[LA2000ok == TRUE ,  density(IncomingShortwavePotential * 0.81 - Swclidnz, na.rm = TRUE)]
-densqr = dtyrmon[LA2000ok == TRUE ,  density(IncomingShortwaveClearSky - Swclidnz, na.rm = TRUE)]
+densref = dt30yrmon[LA2000ok == TRUE ,  density(IncomingShortwavePotential * 0.81 - Swclidnz, na.rm = TRUE)]
+densqr = dt30yrmon[LA2000ok == TRUE ,  density(IncomingShortwaveClearSky - Swclidnz, na.rm = TRUE)]
 
 ylims = c(-130,100)
 ylims = c(-70,70)
 op = par(mar=c(4.1, 4.1, 2, 0), las = 1, mgp = c(2,0.15,0), tck = 0.01)
 par(fig=c(0,0.8,0,1), new=FALSE)
-plot( I(IncomingShortwavePotential * 0.81 - Swclidnz)  ~ Swclidnz, data = dtyrmon[LA2000ok == TRUE,],
+plot( I(IncomingShortwavePotential * 0.81 - Swclidnz)  ~ Swclidnz, data = dt30yrmon[LA2000ok == TRUE,],
       pch = ".", cex = 2, ylim = ylims, col = "grey",
       xlab = expression(bold("Clear-sky shortwave radiation, Long and Ackerman method ")(W*m^-2) ),
       # xlab = "",
@@ -392,7 +395,7 @@ plot( I(IncomingShortwavePotential * 0.81 - Swclidnz)  ~ Swclidnz, data = dtyrmo
 # par(opx)
 abline(h = 0, lty = 2)
 grid()
-points( I(IncomingShortwaveClearSky - Swclidnz)  ~ Swclidnz, data = dtyrmon[LA2000ok == TRUE,],pch = ".", cex = 2, ylim = ylims, col = 2 )
+points( I(IncomingShortwaveClearSky - Swclidnz)  ~ Swclidnz, data = dt30yrmon[LA2000ok == TRUE,],pch = ".", cex = 2, ylim = ylims, col = 2 )
 legend("bottomleft", c("Reference with fractional transmission","Quantile regression approach"), col = c("grey","red"), pch = ".", pt.cex = 4, bty = "n")
 
 # auto.key = list(corner = c(0,0), text = c("Constant fractional transmission","Quantile regression approach")
@@ -412,8 +415,19 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 
 
 #### Figure 2 effect of exponent b ####
-load(file = paste0(prdata,"LIN_200308.rdata"))
-dat1 = dtbsrn[year(Date) == 2003 & month(Date) == 8 & mday(Date) == 11, ]
+# sico = "LIN"
+# load(file = paste0(pdat,"rdata/", sico,".rdata" ) ) 
+# dtbsrn =  dtbsrn[year(Date) == 2003 & month(Date) == 8,  ]
+# save(dtbsrn, file = paste0(prdata,"LIN_200308.rdata"))
+
+# load(file = paste0(prdata,"LIN_200308.rdata"))
+# LIN20030811 = dtbsrn[year(Date) == 2003 & month(Date) == 8 & mday(Date) == 11, .(Date,Time, IncomingShortwave, Rsdpot_tzlon, Rsdpot_12)]
+# LIN20030811
+# save(LIN20030811, file = paste0(prdata,"LIN20030811.rdata"))
+
+load(file = paste0(prdata,"LIN20030811.rdata"))
+dat1 = LIN20030811 
+#dtbsrn[year(Date) == 2003 & month(Date) == 8 & mday(Date) == 11, ]
 
 # lab_Rsdpot12_name = expression(bold("Potential Shortwave Radiation ")(W*m^-2))
 # lab_Rsdpot12 = expression(bold( R['sd,pot']==S[0]*cdot*cos(SZA)^1.2*" " )(W*m^-2))
@@ -551,7 +565,7 @@ dtsite[ , ftau_cut := cut(ftau, c(0.6,seq(0.7,0.95,0.05),1.1))]
 dtsite[ , levels(ftau_cut)]
 nl = dtsite[ , nlevels(ftau_cut)]
 RsdcsCols = rev(colorRampPalette(brewer.pal(7,"YlOrBr"))(nl))
-dtsite[ , RsdcsCols[ as.numeric(ftau85dt30_cut)]]
+dtsite[ , RsdcsCols[ as.numeric(ftau)]]
 
 #### Figure Map of the sites with ftau color ####
 (gname = paste(pfig,"BSRN_worldmap_ftau.pdf",sep=""))
