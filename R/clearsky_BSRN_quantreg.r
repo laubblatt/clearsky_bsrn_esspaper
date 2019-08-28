@@ -1,11 +1,19 @@
 #' Perform Quantile Regression runs on (half-)hourly BSRN data 
 #' 
 #' @filename clearsky_BSRN_quantreg.r
+#' @author Maik Renner, mrenner [at] bgc-jena.mpg.de
+#' @references  Renner, M., M. Wild, M. Schwarz, and A. Kleidon.
+#'   "Estimating Shortwave Clear-Sky Fluxes from Hourly Global
+#'     Radiation Records by Quantile Regression."
+#'       Earth and Space Science, 2019.
+#'       \url{https://doi.org/10.1029/2019EA000686}
+
 #' @version 2019-08-26 copied stuff from M44_BSRN_hourly_quantreg_85.r for public access 
 #' @version 2019-08-27 running code to perfrom Quantile regression for half-hourly and hourly records 
 #' 
 #' @TODO check paths 
-#' @TÓDO compare R package output with the data that went into the paper
+#' @DONE compare R package output with the data that went into the paper in clearsky_BSRN_quantreg_eval.r
+#' 
 
 ##' packages ----
 library(quantreg)
