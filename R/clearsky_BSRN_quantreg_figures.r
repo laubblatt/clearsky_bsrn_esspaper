@@ -3,6 +3,8 @@
 
 #' @filename clearsky_BSRN_quantreg_figures.r
 #' @depends clearsky_BSRN_quantreg.r
+
+
 #' 
 #' @author Maik Renner, mrenner [at] bgc-jena.mpg.de
 #' @references  Renner, M., M. Wild, M. Schwarz, and A. Kleidon.
@@ -12,39 +14,19 @@
 #'       \url{https://doi.org/10.1029/2019EA000686}
 
 #' @version 2019-08-28 This file is adapted from M44_ClearSky_figures.r  
- 
+#' @version 2019-08-28 code produces now figures and tables using the R package  # library(cleaRskyQuantileRegression)
 
 #' @filename M44_ClearSky_figures.r
 #' @depends M44_BSRN_hourly_quantreg_85.r
 #' @depends read.BSRN.aggregate.r ## providing dt30 dt60 and dt15 aggregates
 #' @depends read.bsrn.pangaea.snapshot.sh
-
-#' @version 2019-04-01 cut figures part from M44_BSRN_hourly_quantreg_85.r and create new file 
 #' 
-#' @version 2019-04-01 improve figure 2 and move stuff to local  
-#' @version 2019-04-01 convert lat long to readable format 
-#' @version 2019-04-01 humidity shapes the fractional solar transmission
-#' @version 2019-04-13 improve supplement figures 
-#' 
-#' @version 2019-06-24 combine the two plots in a multi panel in Fig 4 
-#' @version 2019-06-25 figures and analysis for hourly data using dt60 
-#' @version 2019-06-26 redo table 1 with bold
-#' 
-#' @version 2019-07-01 removed LA2000ok == FALSE from also removed bold dtsitestats_print_avg_kable.html
-#' @version 2019-07-03 remove lt1 in tau stats updated figs 
-#' 
-#' @TODO pdftoppm kills bold fonts on caserta, check fonts with pdffonts 
+#' @TODO DATA Dependencies 
+#' load(file = paste0(prdata,"LIN_200308.rdata"))
 #'  
 #' 
-#' #' 
-#' 
-### copy figure to local
-# rsync -urz --progress mrenner@dialog.bgc-jena.mpg.de:/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/figures/* ~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/figures/
 
-## sync data for figures on local machine 
-# rsync -urz --progress mrenner@dialog.bgc-jena.mpg.de:/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/rdata/dtyrmon.rdata ~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/rdata/
-# rsync -urz --progress mrenner@dialog.bgc-jena.mpg.de:/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/rdata/dtyrmontau.rdata ~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/rdata/
-  # R
+
 
 ##' packages ----
 library(tidyverse)
@@ -73,6 +55,13 @@ library(sp)
 # install.packages("devtools")
 # library(devtools)
 # install_github("laubblatt/phaselag")
+source("~/bgc/github/laubblatt/phaselag/R/data.table.regression.utils.R")
+
+# install.packages("devtools")
+# library(devtools)
+# install_github("laubblatt/cleaRskyQunatileRegression")
+library(cleaRskyQuantileRegression)
+
 
 
 coordinates2degreeminute = function(x, ..., sec = FALSE) { 
@@ -103,43 +92,48 @@ if (is.element(unlist(si[[4]]), c("konya-ubuntu","birne","quillota", "caserta.bg
   pfig = "/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/figures/"
 }
 
+prdata = "~/bgc/gitbgc/clearsky_bsrn_esspaper/rdata/"
+pfig = "~/bgc/gitbgc/clearsky_bsrn_esspaper/figures/"
+pdataETHZ = "~/bgc/gitbgc/clearsky_bsrn_esspaper/dataETHZ/"
+
 
 #### LOAD META DATA ####
 ### BRSN_state is the summary file of the Long and Ackerman 2000 method done by Maria Hakuba
-(BSRNmeta  = fread(paste0(pdat, "dataETHZ/BSRN_state.csv")) )
-BSRNmeta[ , SiteCode := toupper(site)]
-str(BSRNmeta)
+# (BSRNmeta  = fread(paste0(pdat, "dataETHZ/BSRN_state.csv")) )
+# BSRNmeta[ , SiteCode := toupper(site)]
+# str(BSRNmeta)
 
-list.files(prdata)
-load(file = paste0(prdata,"dtconf.rdata"))
-dtconf
+# list.files(prdata)
+# load(file = paste0(prdata,"dtconf.rdata"))
+# dtconf
 ## get doubtful from comments in lost column of BSRN_state-txt
 doubtful = c("ALE","ILO","SPO","SOV")
-dtconf[ , LA2000ok := TRUE]
-dtconf[daily == 0 , LA2000ok := FALSE]
-#dtconf[SiteCode %in% doubtful , doubtful := TRUE ]
-#dtconf[, doubtful := NULL ]
-dtconf[SiteCode %in% doubtful , LA2000ok := FALSE]
-
-dtconf[, .(SiteCode,LA2000ok,daily)]
+# dtconf[ , LA2000ok := TRUE]
+# dtconf[daily == 0 , LA2000ok := FALSE]
+# #dtconf[SiteCode %in% doubtful , doubtful := TRUE ]
+# #dtconf[, doubtful := NULL ]
+# dtconf[SiteCode %in% doubtful , LA2000ok := FALSE]
+# 
+# dtLA2000conf =  dtconf[, .(SiteCode,LA2000ok,daily)]
+# fwrite(dtLA2000conf, file = paste0(prdata,"dtLA2000conf.csv" ))
+dtconf =  fread(file = paste0(prdata,"dtLA2000conf.csv" ))
 
 # merge(dtconf[, .(SiteCode,LA2000ok,daily)],BSRNmeta , by = "SiteCode")
 # merge(dtconf[, .(SiteCode,LA2000ok,daily)],BSRNmeta , by = "SiteCode")[LA2000ok == FALSE, ]
 # merge(dtconf[, .(SiteCode,LA2000ok,daily)],BSRNmeta , by = "SiteCode")[LA2000ok == TRUE, ]
 # merge(dtconf[, .(SiteCode,LA2000ok,daily)],BSRNmeta[ , .(SiteCode,QCconf,QC)] , by = "SiteCode")
 
-(BSRNStationMeta  = fread(paste0(pdat, "dataBSRN/BSRN_Stations.csv")) )
+(BSRNStationMeta  = fread(paste0(prdata, "BSRN_Stations.csv")) )
 BSRNStationMeta[ , URIofevent := NULL]
 # tion no: 11; Surface type: tundra; Topography type: mountain valley, rural; Horizon: doi:10.1594/PANGAEA.669522; Station scientist: Marion.Maturilli@awi.de
 BSRNStationMeta[ , Comment := NULL]
 str(BSRNStationMeta)
 setkey(BSRNStationMeta,SiteCode)
 BSRNStationMeta[ , .(SiteCode,Elevation)]
-list.files(pdat)
-(BSRNclearsky  = fread(paste0(pdat, "dataETHZ/CSW_mm_Swclidnz_nighttime0_201709.dat"), na.strings = "-999.9") )
+
+(BSRNclearsky  = fread(paste0(pdataETHZ, "CSW_mm_Swclidnz_nighttime0_201709.dat"), na.strings = "-999.9") )
 setnames(BSRNclearsky, c("V1","V2", "V15"), c("site", "year", "annual") )
 BSRNclearsky[ , SiteCode := toupper(site)]
-
 dtclearsky =  melt.data.table(BSRNclearsky, id.vars = c("SiteCode", "year", "site") , value.name = "Swclidnz" )
 dtclearsky[ , month := as.numeric(substr(variable,2,4)) - 2]
 dtclearsky[, variable := NULL]
@@ -336,7 +330,7 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 #' @version 2019-07-03 update by removing poor sites here 
 (gname = paste(pfig,"BSRN_RClearSky85fit30min_vs_LongAckerman_allmonth_hexbin.pdf",sep=""))
 pdf(gname,6,6)
-hexbinplot(IncomingShortwaveClearSky ~ Swclidnz, data = dtyrmon[LA2000ok == TRUE, ], type =  c("p", "r","g"),
+hexbinplot(IncomingShortwaveClearSky ~ Swclidnz, data = dt30yrmon[LA2000ok == TRUE, ], type =  c("p", "r","g"),
            xlab = expression(bold("Standard method (Long and Ackerman 2000) ")(W*m^-2)),
            ylab = expression(bold("Quantile Regression method, "*omega==0.85*"  ")(W*m^-2)),
            main = "Monthly mean Clear Sky Solar Radiation") +
@@ -346,18 +340,16 @@ gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
 system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 
-dtyrmon[LA2000ok == TRUE , rmse(Swclidnz, IncomingShortwaveClearSky_dt60)]
-# [1] 8.859589
-dtyrmon[LA2000ok == TRUE , rmse(Swclidnz, IncomingShortwaveClearSky)]
-# [1] 8.492107 ## reported in text ###
+dt30yrmon[LA2000ok == TRUE , rmse(Swclidnz, IncomingShortwaveClearSky)]
+# [1] 8.600331 ## reported in text ###
 
 MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = Rsdpot_12* 0.81 )
-dtyrmon[LA2000ok == TRUE , MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = Rsdpot_12* 0.81 )]
-# 0.7422243  reduction in residual variance by 74% reportent in text 
+dt30yrmon[LA2000ok == TRUE , MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = IncomingShortwavePotential* 0.81 )]
+# 0.7396669  reduction in residual variance by 74% reportent in text 
 
 (gname = paste(pfig,"BSRN_RClearSky85fit60min_vs_LongAckerman_allmonth_hexbin.pdf",sep=""))
 pdf(gname,6,6)
-hexbinplot(IncomingShortwaveClearSky_dt60 ~ Swclidnz, data = dtyrmon[LA2000ok == TRUE, ], type =  c("p", "r","g"),
+hexbinplot(IncomingShortwaveClearSky ~ Swclidnz, data = dt60yrmon[LA2000ok == TRUE, ], type =  c("p", "r","g"),
            xlab = expression(bold("Standard method (Long and Ackerman 2000) ")(W*m^-2)),
            ylab = expression(bold("Quantile Regression method, "*omega==0.85*"  ")(W*m^-2)),
            main = "Monthly mean Clear Sky Solar Radiation") +
@@ -372,7 +364,7 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 ### show the improvement against a fixed fraction estimate
 (gname = paste(pfig,"BSRN_Rsdcs_diff_LA2000_ref_monthly.pdf",sep=""))
 pdf(gname,6,6)
-xyplot( I(Rsdpot_12 * 0.81 - Swclidnz)  + I(IncomingShortwaveClearSky - Swclidnz) ~ Swclidnz, data = dtyrmon,
+xyplot( I(IncomingShortwavePotential * 0.81 - Swclidnz)  + I(IncomingShortwaveClearSky - Swclidnz) ~ Swclidnz, data = dtyrmon,
         pch = ".", cex = 2,
         xlab = expression(bold("Clear-sky global radiation, Standard method ")(W*m^-2) ),
         ylab = expression(bold("Difference to Standard method ")(W*m^-2) ),
@@ -385,14 +377,14 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 #### Figure 8 updated with a marginal distribution of the residuals 
 (gname = paste(pfig,"BSRN_Rsdcs_diff_LA2000_ref_monthly_margdens.pdf",sep=""))
 pdf(gname,7.8,5)
-densref = dtyrmon[LA2000ok == TRUE ,  density(Rsdpot_12 * 0.81 - Swclidnz, na.rm = TRUE)]
+densref = dtyrmon[LA2000ok == TRUE ,  density(IncomingShortwavePotential * 0.81 - Swclidnz, na.rm = TRUE)]
 densqr = dtyrmon[LA2000ok == TRUE ,  density(IncomingShortwaveClearSky - Swclidnz, na.rm = TRUE)]
 
 ylims = c(-130,100)
 ylims = c(-70,70)
 op = par(mar=c(4.1, 4.1, 2, 0), las = 1, mgp = c(2,0.15,0), tck = 0.01)
 par(fig=c(0,0.8,0,1), new=FALSE)
-plot( I(Rsdpot_12 * 0.81 - Swclidnz)  ~ Swclidnz, data = dtyrmon[LA2000ok == TRUE,],
+plot( I(IncomingShortwavePotential * 0.81 - Swclidnz)  ~ Swclidnz, data = dtyrmon[LA2000ok == TRUE,],
       pch = ".", cex = 2, ylim = ylims, col = "grey",
       xlab = expression(bold("Clear-sky shortwave radiation, Long and Ackerman method ")(W*m^-2) ),
       # xlab = "",
@@ -426,9 +418,9 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 load(file = paste0(prdata,"LIN_200308.rdata"))
 dat1 = dtbsrn[year(Date) == 2003 & month(Date) == 8 & mday(Date) == 11, ]
 
-lab_Rsdpot12_name = expression(bold("Potential Shortwave Radiation ")(W*m^-2))
-lab_Rsdpot12 = expression(bold( R['sd,pot']==S[0]*cdot*cos(SZA)^1.2*" " )(W*m^-2))
-lab_Rsd      = expression(bold("Observed Shortwave Radiation ")(W*m^-2))
+# lab_Rsdpot12_name = expression(bold("Potential Shortwave Radiation ")(W*m^-2))
+# lab_Rsdpot12 = expression(bold( R['sd,pot']==S[0]*cdot*cos(SZA)^1.2*" " )(W*m^-2))
+# lab_Rsd      = expression(bold("Observed Shortwave Radiation ")(W*m^-2))
 #### Figure 2a
 (gname = paste(pfig,"BSRN_Rsd2RsdpotExpo_clearskyday_",sico,".pdf",sep=""))
 pdf(gname,5,5)
@@ -482,8 +474,6 @@ tz(dat1$Time)
 
 
 
-
-
 ##### Figure 5 Scatterplot frac ######
 #' Figure 5 Comparison of monthly fractional clear-sky solar transmission obtained with the proposed QR method and the Standard method.
 #' Both methods reveal estimates larger than 1 which are deemed unreliable and colored as grey dots. 
@@ -491,14 +481,12 @@ tz(dat1$Time)
 #'
 #' @version 2019-07-02 remove points from comparison when LA2000ok 
 #' @version 2019-07-03 do not exclude ftau > 1 since this corrupts site scale ostats in table 1 
-dtyrmon[ftau85dt30 > 1 , unique(SiteCode)]
-dtyrmon[ftau85dt30 > 1 & ftau_LA2000 > 1  , .(.N, first(lat)), by = SiteCode]
 
 (gname = paste(pfig,"BSRN_fractrans85fit30min_vs_LongAckerman_allmonth.pdf",sep=""))
 pdf(gname,5,5)
 lims = c(0.4,1.3)
 op = par(mar = c(4,5,3,2), las = 1, mgp = c(1.5,0.15,0), tck = 0.01,pty = "sq")
-plot(ftau85dt30 ~ ftau_LA2000, data = dtyrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ], type =  c("p"),
+plot(ftau ~ ftau_LA2000, data = dt30yrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ], type =  c("p"),
      xlab = expression(bold("Standard method (Long and Ackerman 2000) ")),
      ylab = expression(bold("Quantile Regression method  ")),
      xlim = lims, ylim = lims, col = 4, pch = "." )
@@ -508,53 +496,36 @@ plot(ftau85dt30 ~ ftau_LA2000, data = dtyrmon[SiteCode %in% dtconf[LA2000ok==TRU
 title("Fractional clear-sky solar transmission", line = 0.3)
 grid()
 abline(0,1,lty = 2, col = "darkgrey")
-fitall = lm(ftau85dt30 ~ ftau_LA2000, data = dtyrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ])
+fitall = lm(ftau ~ ftau_LA2000, data = dt30yrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ])
 summary(fitall)
 abline(fitall, col = 4)
 sufiall = summary(fitall)
 (textfitall =  bquote(y == .(sprintf('%.2f', sufiall$coef[1,1])) + .(sprintf('%.2f', sufiall$coef[2,1]))*x*", "* italic(r)^2*"="*.(sprintf('%.2f', sufiall$adj.r.squared) )*", n = "*.(length(sufiall$residuals)) ))
 legend("bottom", as.expression(textfitall), col = 4, lty = 1, bty = "n")
-
-# fitlt1 = lm(ftau85dt30 ~ ftau_LA2000, data = dtyrmon[ftau85dt30 < 1 & ftau_LA2000 < 1, ][SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ])
-# #fitlt1 = lm(ftau85dt30 ~ ftau_LA2000, data = dtyrmon[ftau85dt30 < .95 & ftau_LA2000 < .95, ])
-# #fitlt1 = lm(ftau85dt30 ~ ftau_LA2000, data = dtyrmon[ , ])
-# abline(fitlt1, col = 4)
-# sufilt1 = summary(fitlt1)
-# (textfitlt1 =  bquote(y == .(sprintf('%.2f', sufilt1$coef[1,1])) + .(sprintf('%.2f', sufilt1$coef[2,1]))*x*", "* italic(r)^2*"="*.(sprintf('%.2f', sufilt1$adj.r.squared) )*", n = "*.(length(sufilt1$residuals)) ))
-# legend("bottom", as.expression(textfitlt1), col = 4, lty = 1, bty = "n")
 gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
 system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
-# system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png -freetype yes ",gname, gname))
-# system(paste("pdftoppm -h"))
 
 (gname = paste(pfig,"BSRN_fractrans85fit60min_vs_LongAckerman_allmonth.pdf",sep=""))
 pdf(gname,5,5)
 lims = c(0.4,1.3)
 op = par(mar = c(4,5,3,2), las = 1, mgp = c(1.5,0.15,0), tck = 0.01,pty = "sq")
-plot(ftau85dt60 ~ ftau_LA2000, data = dtyrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ], type =  c("p"),
+plot(ftau ~ ftau_LA2000, data = dt60yrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ], type =  c("p"),
      xlab = expression(bold("Standard method (Long and Ackerman 2000) ")),
      ylab = expression(bold("Quantile Regression method using hourly data ")),
      xlim = lims, ylim = lims, col = 4, pch = "." )
 title("Fractional clear-sky solar transmission", line = 0.3)
 grid()
 abline(0,1,lty = 2, col = "darkgrey")
-fitall = lm(ftau85dt60 ~ ftau_LA2000, data = dtyrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ])
+fitall = lm(ftau ~ ftau_LA2000, data = dt60yrmon[SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ])
 summary(fitall)
 abline(fitall, col = 4)
 sufiall = summary(fitall)
 (textfitall =  bquote(y == .(sprintf('%.2f', sufiall$coef[1,1])) + .(sprintf('%.2f', sufiall$coef[2,1]))*x*", "* italic(r)^2*"="*.(sprintf('%.2f', sufiall$adj.r.squared) )*", n = "*.(length(sufiall$residuals)) ))
 legend("bottom", as.expression(textfitall), col = 4, lty = 1, bty = "n")
-# fitlt1 = lm(ftau85dt60 ~ ftau_LA2000, data = dtyrmon[ftau85dt60 < 1 & ftau_LA2000 < 1, ][SiteCode %in% dtconf[LA2000ok==TRUE,SiteCode], ])
-# abline(fitlt1, col = 4)
-# sufilt1 = summary(fitlt1)
-# (textfitlt1 =  bquote(y == .(sprintf('%.2f', sufilt1$coef[1,1])) + .(sprintf('%.2f', sufilt1$coef[2,1]))*x*", "* italic(r)^2*"="*.(sprintf('%.2f', sufilt1$adj.r.squared) )*", n = "*.(length(sufilt1$residuals)) ))
-# legend("bottom", as.expression(textfitlt1), col = 4, lty = 1, bty = "n")
 gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
 system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
-
-
 
 
 ##### map of the sites #####
@@ -565,10 +536,10 @@ library(rgdal)
 library(rworldmap)
 data(coastsCoarse)
 
-dtmetamap = copy(dtsite)
-coordinates(dtmetamap) <- c("lon", "lat")
+dtmetamap = copy(dtsitestats)
+coordinates(dtmetamap) <- c("Longitude", "Latitude")
 proj4string(dtmetamap) <- proj4string(coastsCoarse)
-proj4string(dtmetamap) <- proj4string(tz_world)
+# proj4string(dtmetamap) <- proj4string(tz_world)
 str(dtsite)
 dtsite[ , summary(IncomingShortwaveClearSky)]
 dtsite[ , IncomingShortwaveClearSky_cut := cut(IncomingShortwaveClearSky, seq(0,350,50))]
@@ -578,10 +549,10 @@ RsdcsCols = colorRampPalette(brewer.pal(7,"Reds"))(nl)
 RsdcsCols = colorRampPalette(brewer.pal(7,"PuRd"))(nl)
 dtsite[ , RsdcsCols[ as.numeric(IncomingShortwaveClearSky_cut)]]
 
-dtsite[ , summary(ftau85dt30)]
-dtsite[ , ftau85dt30_cut := cut(ftau85dt30, c(0.6,seq(0.7,0.95,0.05),1.1))]
-dtsite[ , levels(ftau85dt30_cut)]
-nl = dtsite[ , nlevels(ftau85dt30_cut)]
+dtsite[ , summary(ftau)]
+dtsite[ , ftau_cut := cut(ftau, c(0.6,seq(0.7,0.95,0.05),1.1))]
+dtsite[ , levels(ftau_cut)]
+nl = dtsite[ , nlevels(ftau_cut)]
 RsdcsCols = rev(colorRampPalette(brewer.pal(7,"YlOrBr"))(nl))
 dtsite[ , RsdcsCols[ as.numeric(ftau85dt30_cut)]]
 
@@ -590,12 +561,12 @@ dtsite[ , RsdcsCols[ as.numeric(ftau85dt30_cut)]]
 pdf(gname,10,7)
 plot(coastsCoarse, ylim = c(-65,90), col = "grey")
 points(dtmetamap, col = 1 , pch = 0)
-points(dtmetamap, col = dtsite[ , RsdcsCols[ as.numeric(ftau85dt30_cut)]], pch = 15)
-pointLabel(dtmetamap$lon, dtmetamap$lat, dtmetamap$SiteCode, cex = 0.8)
-(leg = dtsite[order(lat, decreasing = TRUE) , paste(SiteCode, SiteName, sep = ", ")])
+points(dtmetamap, col = dtsite[ , RsdcsCols[ as.numeric(ftau_cut)]], pch = 15)
+pointLabel(dtmetamap$Longitude, dtmetamap$Latitude, dtmetamap$SiteCode, cex = 0.8)
+(leg = dtsitestats[order(Latitude, decreasing = TRUE) , paste(SiteCode, SiteName, sep = ", ")])
 # (leg = dtsite[order(lat, decreasing = TRUE) , paste(SiteCode, SiteName, round(IncomingShortwaveClearSky), round(Swclidnz), sep = ", ")])
 # legend("bottomleft", leg , col = 2 , pch = 0, cex = 0.5, bty = "n", inset = c(0,0.021))
-legend("bottomleft", dtsite[ , levels(ftau85dt30_cut)] , col = RsdcsCols , pch = 15, cex = 1,
+legend("bottomleft", dtsite[ , levels(ftau_cut)] , col = RsdcsCols , pch = 15, cex = 1,
        bty = "n", inset = c(0.15,0.1), title = expression(bold(R['sd']/R['sd,pot'])) )
 
 gg = dev.off()
@@ -608,8 +579,8 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 pdf(gname,16,10)
 plot(coastsCoarse, ylim = c(-65,90), col = "grey")
 points(dtmetamap, col = dtsite[ , RsdcsCols[ as.numeric(IncomingShortwaveClearSky_cut)]], pch = 15)
-pointLabel(dtmetamap$lon, dtmetamap$lat, dtmetamap$SiteCode)
-(leg = dtsite[order(lat, decreasing = TRUE) , paste(SiteCode, SiteName, sep = ", ")])
+pointLabel(dtmetamap$Longitude, dtmetamap$Latitude, dtmetamap$SiteCode, cex = 0.8)
+(leg = dtsitestats[order(Latitude, decreasing = TRUE) , paste(SiteCode, SiteName, sep = ", ")])
 # (leg = dtsite[order(lat, decreasing = TRUE) , paste(SiteCode, SiteName, round(IncomingShortwaveClearSky), round(Swclidnz), sep = ", ")])
 legend("bottomleft", leg , col = 2 , pch = 15, cex = 0.5, bty = "n", inset = c(0,0.021))
 legend("bottomleft", dtsite[ , levels(IncomingShortwaveClearSky_cut)] , col = RsdcsCols , pch = 15, cex = 1,
@@ -638,24 +609,21 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 
 
 #### fractional solar transmission time series ####
-dtyrmon[ , cor(ftau85dt30,I(Swclidnz/Rsdpot_12), use = "pair")^2] 
-
-xyplot(ftau85dt30 +  I(Swclidnz/Rsdpot_12)  ~ I(year + month/12) | paste(SiteCode),
-       data = dtyrmon)
+dt30yrmon[ , cor(ftau,ftau_LA2000, use = "pair")^2] 
 
 ### FIGURE S3 ####
 #' @version 2019-07-02 update and annotate problem sites in panel-label 
 #' 
 # dtyrmon[ , doubtful := NULL]
 
-dtyrmon4S3 = copy(dtyrmon)
+dtyrmon4S3 = copy(dt30yrmon)
 dtyrmon4S3[, SiteCodeOnPanel := SiteCode]
 dtyrmon4S3[daily == 0 , SiteCodeOnPanel :=  paste(SiteCode, '(b)')  ]
 dtyrmon4S3[SiteCode %in% doubtful, SiteCodeOnPanel :=  paste(SiteCode, '(a)')  ]
 
 (gname = paste(pfig,"BSRN_FractionalSolarTransmission12_ftau85dt30_vs_LongAckerman_timeseries.pdf",sep=""))
 pdf(gname,8,12)
-xyplot(ftau85dt30 +  I(Swclidnz/Rsdpot_12)  ~ I(year + month/12) | paste(SiteCodeOnPanel),
+xyplot(ftau + ftau_LA2000 ~ I(year + month/12) | paste(SiteCodeOnPanel),
        data = dtyrmon4S3, ylim = c(0.6,1.3), lwd = c(2,1),
        type =  c("l","g") , xlab = list(label = "Time", cex = 1.3),
        ylab = list(label = "Fractional Solar Transmission", cex = 1.3),
@@ -680,19 +648,19 @@ op = par(mar = c(1,3,1.2,1), las = 1, mgp = c(2,0.15,0), tck = 0.01, mfrow = c(5
 ylims = c(0.72,0.95)
 ii = 1
 for (sico in sics) {
-  dat = dtyrmon[SiteCode == sico , ]
+  dat = BSRNStationMeta[dt30yrmon][SiteCode == sico , ]
   if (dat[ , unique(Latitude) < -50 ]) 
-    (ylims = dat[ , range(c(ftau85dt30,ftau_LA2000),na.rm=TRUE)] + c(-0.02, 0.02))
+    (ylims = dat[ , range(c(ftau,ftau_LA2000),na.rm=TRUE)] + c(-0.02, 0.02))
   
   if (ii == 3) { ylab = expression(bold("Fractional transmission")) 
   } else ylab = ""
   plot(ftau_LA2000 ~ I(year + month/12),  data = dat , type = "l" , lwd = 2.5 , xlab = "", ylab = ylab, ylim = ylims, xlim = c(1992,2015))
   # plot(ftau_LA2000 ~ I(year + month/12),  data = dat , type = "l" , lwd = 2.5 , xlab = "", ylab = lab_ftau, ylim = ylims)
   grid()
-  lines(ftau85dt30 ~ I(year + month/12),  data = dat , col = 2, lwd = 1.5  )
-  points(ftau85dt30 ~ I(year + month/12),  data = dat[dt30rq085_slope1 != ftau85dt30 , ] , col = colfilled, pch = 3 , lwd = 2 )
+  lines(ftau ~ I(year + month/12),  data = dat , col = 2, lwd = 1.5  )
+  points(ftau ~ I(year + month/12),  data = dat[Window != "1mon" , ] , col = colfilled, pch = 3 , lwd = 2 )
   # title(paste(sico, dat[, unique(SiteName)], dat[!is.na(lon), unique(lon)], dat[!is.na(lat), unique(lat)]), line = 0.3)
-  title(paste(sico, dat[, unique(SiteName)], dat[!is.na(lat), coordinates2degreeminute(unique(lat),NS =TRUE)], dat[!is.na(lon), coordinates2degreeminute(unique(lon))], sep = ", "), line = 0.3)
+  title(paste(sico, dat[, unique(SiteName)], dat[!is.na(Latitude), coordinates2degreeminute(unique(Latitude),NS =TRUE)], dat[!is.na(Longitude), coordinates2degreeminute(unique(Longitude))], sep = ", "), line = 0.3)
   if (ii == 4)
     legend("bottomleft", c("Long and Ackerman method" , "Quantile Regression approach", "Sampling window > 1 month"), col = c(1,2,colfilled), lty = c(1,1,NA), pch = c(NA,NA,3), bty = "n")
   # legend("topleft", c("Standard Method" , "Quantile Regression approach"), col = c(1,2), lty = 1, bty = "n")
@@ -701,38 +669,14 @@ for (sico in sics) {
 }
 gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
-system(paste("open ",gname))
 system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 
-ylims = c(0.52,1.2)
-sico = "LER"
-
-ylims = c(0.3,1.1)
-ylab = expression(bold("Fractional transmission"))
-sico = "BAR"
-(gname = paste(pfig,"BSRN_ftau_timeseries_",sico,".pdf",sep=""))
-pdf(gname,6,4)
-op = par(mar = c(1,3,1.2,1), las = 1, mgp = c(2,0.15,0), tck = 0.01)
-dat = dtyrmon[SiteCode == sico , ]
-plot(ftau_LA2000 ~ I(year + month/12),  data = dat , type = "l" , lwd = 2.5 , xlab = "", ylab = ylab, ylim = ylims, xlim = c(1992,2015))
-# plot(ftau_LA2000 ~ I(year + month/12),  data = dat , type = "l" , lwd = 2.5 , xlab = "", ylab = lab_ftau, ylim = ylims)
-grid()
-lines(ftau85dt30 ~ I(year + month/12),  data = dat , col = 2, lwd = 1.5  )
-points(ftau85dt30 ~ I(year + month/12),  data = dat[dt30rq085_slope1 != ftau85dt30 , ] , col = colfilled, pch = 3 , lwd = 2 )
-title(paste(sico, dat[, unique(SiteName)], dat[!is.na(lat), coordinates2degreeminute(unique(lat),NS =TRUE)], dat[!is.na(lon), coordinates2degreeminute(unique(lon))], sep = ", "), line = 0.3)
-legend("bottomright", c("Standard Method" , "Quantile Regression approach", "Sampling window > 1 month"), col = c(1,2,colfilled), lty = c(1,1,NA), pch = c(NA,NA,3), bty = "n")
-gg = dev.off()
-system(paste("pdfcrop ",gname,gname))
-system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
-
-
-sics = c("NYA", "BOU", "PAY", "BER", "MAN" , "ASP", "GVN")
 
 (gname = paste(pfig,"BSRN_FractionalSolarTransmission12_ftau85dt30_vs_LongAckerman_timeseries.pdf",sep=""))
 pdf(gname,20,12)
-xyplot(ftau85dt30 + ftau_LA2000   ~ I(year + month/12) | paste(SiteCode, substr(SiteName,1,12)),
+xyplot(ftau + ftau_LA2000   ~ I(year + month/12) | paste(SiteCode, substr(SiteName,1,12)),
 #       data = dtyrmon[SiteCode %in% sics, ], ylim = c(0.45,1.3),
-       data = dtyrmon, ylim = c(0.45,1.3),
+       data = BSRNStationMeta[ dt30yrmon ], ylim = c(0.45,1.3),
        type =  c("l","g") , xlab = list(label = "year and month", cex = 1.5),
        ylab = list(label = "Fractional Solar Transmission", cex = 1.3),
        scales=list(tck=c(1,0), x=list(cex=1.2), y=list(cex=1.2)),
@@ -743,42 +687,11 @@ gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
 system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 
-sico = sics[7]
-
-for (sico in sics) {
-  (gname = paste(pfig,"BSRN_ftau_timeseries_",sico,".pdf",sep=""))
-  pdf(gname,8,5)
-  dat = dtyrmon[SiteCode == sico , ]
-  (ylims = dat[ , range(c(ftau85dt30,ftau_LA2000),na.rm=TRUE)] + c(-0.02, 0.02))
-  
-  op = par(mar = c(4,5,3,2), las = 1, mgp = c(2,0.15,0), tck = 0.01)
-  plot(ftau_LA2000 ~ I(year + month/12),  data = dat , type = "l" , lwd = 2.5 , xlab = "", ylab = lab_ftau, ylim = ylims)
-  grid()
-  lines(ftau85dt30 ~ I(year + month/12),  data = dat , col = 2, lwd = 2  )
-  # points(dt30rq090_slope1 ~ I(year + month/12),  data = dat[dt30rq090_slope1 != ftau85dt30 & dt30rq090_R1 > 0.75 , ] , col = 2  )
-  # points(ftau85dt30 ~ I(year + month/12),  data = dat[dt30rq090_slope1 != ftau85dt30 & dt30rq090_R1 > 0.75 , ] , col = 2  )
-  # show points where imputation was done
-  points(ftau85dt30 ~ I(year + month/12),  data = dat[dt30rq090_slope1 != ftau85dt30 , ] , col = 2  )
-  # lines(dt30rq090_slope1 ~ I(year + month/12),  data = dat , col = 2, lwd = 1  )
-  title(paste(sico, dat[, unique(SiteName)], dat[!is.na(lon), unique(lon)], dat[!is.na(lat), unique(lat)]), line = 0.3)
-  legend("bottomright", c("Standard Method" , "Quantile Regression approach"), col = c(1,2), lty = 1, bty = "n")
-  gg = dev.off()
-  system(paste("pdfcrop ",gname,gname))
-  system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
-}
-
-
-dat
-
-xyplot(T2 ~ month , data = dat)
-xyplot(ftau85dt30 + ftau_LA2000 ~ month , data = dtyrmon[SiteCode == "DOM",])
-
-
 
 (gname = paste(pfig,"BSRN_SWClearSky12_P85fit30min_vs_LongAckerman_timeseries.pdf",sep=""))
 pdf(gname,20,12)
 xyplot(IncomingShortwaveClearSky + I(Swclidnz)  ~ I(year + month/12) | paste(SiteCode, substr(SiteName,1,12)),
-       data = dtyrmon, lwd = c(1.5,0.8),
+       data = BSRNStationMeta[ dt30yrmon ], lwd = c(1.5,0.8),
        type =  c("l","g") , xlab = list(label = "year and month", cex = 1.5),
        ylab = list(label =lab_Rsdcs , cex = 1.3),
        scales=list(tck=c(1,0), x=list(cex=1.2), y=list(cex=1.2)),
@@ -788,35 +701,11 @@ gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
 system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 
-for (sico in sics) {
-  (gname = paste(pfig,"BSRN_Rsdcs_timeseries_",sico,".pdf",sep=""))
-  pdf(gname,8,5)
-  dat = dtyrmon[SiteCode == sico , ]
-  (ylims = c(0, dat[ , max(c(IncomingShortwaveClearSky, Swclidnz),na.rm=TRUE)] + 30 ))
-  (ylims = c(0, 450)
-    
-    op = par(mar = c(4,5,3,2), las = 1, mgp = c(2,0.15,0), tck = 0.01)
-    plot(Swclidnz  ~ I(year + month/12),  data = dat , type = "l" , lwd = 2 , xlab = "", ylab = lab_Rsdcs, ylim = ylims)
-    grid()
-    lines(IncomingShortwaveClearSky ~ I(year + month/12),  data = dat , col = 2, lwd = 1.8  )
-    points(IncomingShortwaveClearSky ~ I(year + month/12),  data = dat[dt30rq090_slope1 != ftau85dt30 , ] , col = 2  )
-    # lines(dt30rq090_slope1 ~ I(year + month/12),  data = dat , col = 2, lwd = 1  )
-    title(paste(sico, dat[, unique(SiteName)], dat[!is.na(lon), unique(lon)], dat[!is.na(lat), unique(lat)]), line = 0.3)
-    legend("bottomright", c("Standard Method" , "Quantile Regression approach"), col = c(1,2), lty = 1, bty = "n")
-    gg = dev.off()
-    # system(paste("pdfcrop ",gname,gname))
-}
-
 
 
 #### Sensitivity study on tau ######
-### the filter finds different sets and to use the same set for the sensitivity I remove the values which only exists at a few tau
 #' @update 2019-03-06 tropical sites without seasonal variation in tau in standrad methdo and high latitude sites with outliers excluded 
 #' @update 2019-03-07 these tropical sites still show variation, but really small, so I again include all 
-# (dtyrmontau_skilltau =  dtyrmontau[dtyrmontau_R1set][ !(SiteCode %in%  c(sitespoorLAtrop,sitespoorLAhighlat)),  ][dt30rq_R1 > 0.75 ,
-#                               .(SWcs_MSES =  MSE_SkillScore(o = Swclidnz, p = IncomingShortwaveClearSky, ref = Rsdpot_12* 0.81),
-#                                 FST_r2 = cor(dt30rq_slope1, Swclidnz/Rsdpot_12, use = "pair")^2
-#                               ), by = tau])
 #' @version 20190702 update only LA2000ok
 #' 
 dtyrmontau[dt30rq_R1 > 0.75 , .N, by = list(SiteCode,year,month)]
@@ -895,9 +784,6 @@ system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
 
 
 
-
-
-
 (dtyrmontau_yrmonreg = dcast(dtyrmontau[dtyrmontau_R1set][ , mlm.output.statlong.call("IncomingShortwaveClearSky ~ Swclidnz", .SD), by = tau ], tau ~ statistic))
 
 (gname = paste(pfig,"BSRN_tau_SWcs_xy.pdf",sep=""))
@@ -910,7 +796,7 @@ abline(lm(IncomingShortwaveClearSky ~ Swclidnz, data = dtyrmontau[dtyrmontau_R1s
 abline(lm(IncomingShortwaveClearSky ~ Swclidnz, data = dtyrmontau[dtyrmontau_R1set][round(tau,2) == 0.95, ]), col = 4)
 #points(FST_r2 ~ tau, data = dtyrmontau_skilltau, col = 2)
 grid()
-xyplot(slope1 + R2adj ~ tau, data = dtyrmontau_yrmonreg)
+# xyplot(slope1 + R2adj ~ tau, data = dtyrmontau_yrmonreg)
 gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
 
@@ -956,175 +842,4 @@ gg = dev.off()
 system(paste("pdfcrop ",gname,gname))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-##### OLDER plots and stuff  ###########################
-
-## plot SWCRE
-xyplot(SWCRE)
-(gname = paste(pfig,"BSRN_SWClearSky12_P90fit30min_vs_LongAckerman_timeseries.pdf",sep=""))
-pdf(gname,20,12)
-xyplot(SWCRE_QR + SWCRE_LA2000  ~ I(year + month/12) | paste(SiteCode, substr(SiteName,1,12)),
-       data = dtyrmon[dt30rq090_R2 > 0.4 & abs(dt30rq090_intercept) < 10 ,], lwd = c(1.5,0.8),
-       type =  c("l","g") , xlab = list(label = "year and month", cex = 1.5),
-       ylab = list(label = "Clear Sky Shortwave Radiation  (Wm-2)", cex = 1.3),
-       scales=list(tck=c(1,0), x=list(cex=1.2), y=list(cex=1.2)),
-       par.strip.text=list(cex=1.3),
-       auto.key = list("top", columns = 2, text = c("Quantile regression Approach","Long and Ackerman 2000"), cex = 1.3)  )
-gg = dev.off()
-
-
-#### calculating the fraction of frequency of cloud effects for each day ####
-mdtday[!is.na(Rsd2Rsdpot) , nyr := .N,  by = list(SiteCode,year(Date))]
-mdtday_Rsd2Rsdpot_cut_fyr = mdtday[!is.na(Rsd2Rsdpot) , .(Rsd2Rsdpot_cut_fyr = .N / unique(nyr)),
-                                   by = list(SiteCode,Rsd2Rsdpot_cut,year(Date))]
-
-mdtday_Rsd2Rsdpot_cut_fyr = merge(mdtday_Rsd2Rsdpot_cut_fyr, BSRNStationMeta, by = "SiteCode")
-mdtday_Rsd2Rsdpot_cut_fyr[ , .(Rsd2Rsdpot_cut_fyr = mean(Rsd2Rsdpot_cut_fyr)), by = list(SiteCode,Rsd2Rsdpot_cut)]
-
-(gname = paste(pfig,"BSRN_Rsd2Rsdpotcut_fyr_barchart.pdf",sep=""))
-pdf(gname,20,12)
-# bwplot( Rsd2Rsdpot_cut_fyr ~ Rsd2Rsdpot_cut | SiteCode, data = mdtday_Rsd2Rsdpot_cut_fyr)
-barchart( Rsd2Rsdpot_cut_fyr ~ Rsd2Rsdpot_cut | paste(SiteCode, substr(SiteName,1,20)),
-          data = mdtday_Rsd2Rsdpot_cut_fyr[ , .(Rsd2Rsdpot_cut_fyr = mean(Rsd2Rsdpot_cut_fyr)),
-                                            by = list(SiteCode,Rsd2Rsdpot_cut, SiteName)],
-          scales=list(x=list(rot=90)), ylab = "Relative annual frequency",
-          xlab = "Fraction of incoming to potential solar adiation at surface",
-          main = "Daily fractional shortwave radiation") + layer(panel.abline(h = 0, lty = 2))
-gg = dev.off()
-
-
-
-(gname = paste(pfig,"BSRN_Rsd2Rsdpotcut_daily_barchart.pdf",sep=""))
-pdf(gname,12,8)
-barchart(N ~  Rsd2Rsdpot_cut | SiteCode, data =
-           mdtday[ , .N, by = list(SiteCode,Rsd2Rsdpot_cut)]
-         , scales=list(x=list(rot=90)), ylab = " frequency",
-         xlab = "Fraction of incoming to potential solar adiation at surface" )
-gg = dev.off()
-system(paste("pdfcrop ",gname,gname))
-system(paste("pdftoppm -singlefile -rx 300 -ry 300 -png ",gname, gname))
-
-
-
-###  the difference in slope to 99 could be an indicator of overcast conditions !
-sico = "PAY"
-dat30 = dt30[SiteCode == sico& year(Date) == 2010 & month(Date) == 1, ]
-(gname = paste(pfig,"BSRN_OverCastMonth_",sico,".pdf", sep=""))
-pdf(gname,6,6)
-xyplot(IncomingShortwave ~  Rsdpot_12 | paste(year(Date), month(Date)), data = dat30,
-       xlab = lab_Rsdpot12_name, ylab = lab_Rsd, xlim = c(-20, dat30[ , max(Rsdpot_12)]),
-       panel = function(x, y, ...) {
-         panel.xyplot(x, y, ...)
-         # panel.abline(rq(y~x - 1, tau = 0.9), col=4)
-         panel.ablineq(rq(y~x, tau = 0.99), col=4, at = 0.8, rotate =TRUE, pos = 2)
-         # panel.ablineq(rq(y~x - 1, tau = 0.90), col=2, at = 0.8, rotate =TRUE, pos = 2)
-         panel.ablineq(rq(y~x, tau = 0.90), col=3, at = 0.8, rotate =TRUE, pos = 2)
-       },
-       grid = TRUE
-)
-gg = dev.off()
-
-###  the difference in slope to 99 could be an indicator of overcast conditions !
-xyplot(dt30rq099_slope1 ~ dt30rq090_slope1, data = dtyrmon)
-xyplot( I(dt30rq099_slope1 - dt30rq090_slope1) ~ dt30rq090_slope1, data = dtyrmon, type = c("g","p"), pch = ".", cex = 2)
-xyplot( I(dt30rq099_slope1 - dt30rq090_slope1) ~ dt30rq090_slope1, data = dtyrmon, type = c("g","p"), pch = ".", cex = 2, group = I(dt30rq099_slope1 - dt30rq090_slope1) > 0.2)
-
-
-
-###################
-xyplot(IncomingLongwave ~ Date, data = mdtday[SiteCode == "BOS", ], type = "l")
-
-
-xyplot(IncomingLongwave ~ Date, data = mdtday[SiteCode == "BOS", ], type = "l", group = Rsd2Rsdpot > 0.8)
-
-bwplot(Rsd2Rsdpot ~ factor(month(Date)), data = mdtday[SiteCode == "BOS", ], type = "p")
-
-
-xyplot(T2 ~ Date, data = mdtday[SiteCode == "BOS", ], type = "l", group = Rsd2Rsdpot > 0.8)
-
-
-mdtyr =  mdtday[ , lapply(.SD,meann, nmin = 330, na.rm=TRUE), by = list(SiteCode,year(Date))]
-
-mdtyr[  ,  nyrLWD := sum(!is.na(IncomingLongwave)), by = SiteCode  ]
-
-mdtyr[ nyrLWD > 15 , unique(SiteCode)  ]
-
-xyplot(IncomingLongwave ~ year, data = mdtyr[SiteCode == "BOS", ], type = "b")
-
-p = xyplot(IncomingLongwave ~ year, data = mdtyr[nyrLWD > 14, ], type = "l", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-p = xyplot(IncomingShortwave ~ year, data = mdtyr[nyrLWD > 14, ], type = "l", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-p = xyplot(T2 ~ year, data = mdtyr[nyrLWD > 14, ], type = "l", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-p = xyplot(RH ~ year, data = mdtyr[nyrLWD > 14, ], type = "l", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-p = xyplot(SWCRE_QR ~ year, data = mdtyr[nyrLWD > 14, ], type = "l", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-
-pp = xyplot(IncomingLongwave ~ T2, data = mdtyr[nyrLWD > 14, ], type = "p", group = SiteCode, )
-direct.label(pp,dl.combine(top.points))
-
-pp = xyplot(IncomingShortwave ~ T2, data = mdtyr[nyrLWD > 14, ], type = "p", group = SiteCode, )
-direct.label(pp,dl.combine(top.points))
-
-pp = xyplot(IncomingShortwave ~ IncomingLongwave, data = mdtyr[nyrLWD > 14, ], type = "p", group = SiteCode, )
-direct.label(pp,dl.combine(top.points))
-
-##### needs better fully years fileter first 
-mdtyrcloudy =  mdtday[ , lapply(.SD,meann, nmin = 150, na.rm=TRUE), by = list(SiteCode,year(Date), cloudy = ifelse(Rsd2Rsdpot > 0.8, "clear", "cloudy"))]
-
-mdtyrcloudy[ !is.na(IncomingLongwave) , ]
-
-mdtyrcloudy[  ,  nyrLWD := sum(!is.na(IncomingLongwave)), by = list(SiteCode, cloudy)  ]
-
-mdtyrcloudy[ nyrLWD > 15 , unique(SiteCode)  ]
-
-p = xyplot(IncomingLongwave ~ year, data = mdtyrcloudy[nyrLWD > 14 & cloudy == "clear", ], type = "l", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-dtyr[  ,  nyrLWD := sum(!is.na(IncomingLongwave)), by = list(SiteCode)  ]
-p = xyplot(IncomingLongwave ~ year, data = dtyr[nyrLWD >= 15, ], type = "b", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-p = xyplot(IncomingShortwave ~ year, data = dtyr[nyrLWD >= 15, ], type = "b", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-p = xyplot(IncomingLongwave ~ IncomingShortwave, data = dtyr[nyrLWD >= 15, ], type = "p", group = SiteCode, )
-direct.label(p,dl.combine(top.points))
-
-
-
-dtyrmon[  , esat:= Magnus_Alduchov1996Improved(T2)]
-dtyrmon[  , vaporpressure := RH * esat / 100]
-dtyrmon[  , specifichumidity := 0.622 * vaporpressure/ PoPoPoPo]
-
-dttt = dtyrmon[SiteCode == "LIN",]
-dttt = dtyrmon[SiteCode == "PAY",]
-bwplot(ftau85dt30 ~ as.factor(month), data = dttt)
-xyplot(ftau85dt30 + ftau_LA2000 ~ as.factor(month), data = dttt)
-
-bwplot(RH ~ as.factor(month), data = dttt)
-
-bwplot(vaporpressure ~ as.factor(month), data = dttt)
-xyplot(ftau85dt30 ~ vaporpressure, data = dtyrmon, group = SiteCode)
-xyplot(ftau85dt30 ~ PoPoPoPo, data = dtyrmon, group = SiteCode)
-xyplot(ftau85dt30 ~ specifichumidity, data = dtyrmon, group = SiteCode)
 
