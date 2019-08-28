@@ -147,7 +147,8 @@ dtclearsky
 
 load(file = paste0(prdata,"qr30yrmon.rdata"))
 load(file = paste0(prdata,"qr60yrmon.rdata"))
-
+setkey(qr30yrmon,SiteCode,year,month)
+setkey(qr60yrmon,SiteCode,year,month)
 
 ##################################################
 #### this will merge with the dtclearsky data to get the Long and Ackerman data 
