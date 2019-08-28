@@ -3,6 +3,9 @@
 
 #' @filename clearsky_BSRN_quantreg_figures.r
 #' @depends clearsky_BSRN_quantreg.r
+#' @depends read_BSRN_aggregate.r
+#' @depends read_BSRN_2datatable.r
+
 
 
 #' 
@@ -55,12 +58,20 @@ library(sp)
 # install.packages("devtools")
 # library(devtools)
 # install_github("laubblatt/phaselag")
-source("~/bgc/github/laubblatt/phaselag/R/data.table.regression.utils.R")
 
+if (inherits(try(library(phaselag)),"try-error") ) { 
+  print("library phaselag not available, use source instead")
+  source("~/bgc/github/laubblatt/phaselag/R/data.table.regression.utils.R")
+}
+    
 # install.packages("devtools")
 # library(devtools)
 # install_github("laubblatt/cleaRskyQunatileRegression")
 library(cleaRskyQuantileRegression)
+if (inherits(try(library(cleaRskyQuantileRegression)),"try-error") ) { 
+  print("library cleaRskyQuantileRegression not available, use source instead")
+  source("~/bgc/gitbgc/clearskyquantileregression/R/PotentialRadiation.R")
+}
 
 
 
@@ -69,28 +80,9 @@ coordinates2degreeminute = function(x, ..., sec = FALSE) {
   # str(zz)
   if (sec == FALSE)
     zz@sec <- 0
-  sub("d","??",as.character(zz))
+  sub("d","°",as.character(zz))
 }
 
-si <- Sys.info()  # to get to know on which PC I am running
-unlist(si)
-
-##' PATH  ubuntu konya, birne oder cluster ----
-if (is.element(unlist(si[[4]]), c("konya-ubuntu","birne","quillota", "caserta.bgc-jena.mpg.de"))) {
-  library(phaselag)
-  phom <- "~/Dissertation/daten/"
-  pbtm = "mrenner@dialog.bgc-jena.mpg.de:/Net/Groups/C-Side/BTM/mrenner/scratch/data/"
-  #   pdatnc = "~/Dissertation/daten/fielddata/ameriflux/"
-  prdata <- "~/Dissertation/daten/fielddata/BSRN/"
-  prdata <- "~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/rdata/"
-  pdat <- "~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/"
-  pfig <- "~/bgc/ownCloud/work/manuscripts_mr/M44_ClearSky/figures/"
-}  else {
-  source("~/bgc/github/laubblatt/phaselag/R/data.table.regression.utils.R")
-  pdat = "/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/"
-  prdata = "/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/rdata/"
-  pfig = "/Net/Groups/C-Side/BTM/mrenner/scratch/data/fielddata/BSRN/figures/"
-}
 
 prdata = "~/bgc/gitbgc/clearsky_bsrn_esspaper/rdata/"
 pfig = "~/bgc/gitbgc/clearsky_bsrn_esspaper/figures/"
@@ -199,7 +191,7 @@ load(file = paste0(prdata,"dtyrmontau.rdata"))
 
 ### prepare the Table with all sites and the statistics 
 colnames(dtsitestats)
-dtconf[ , .(SiteCode, daily, b, DiffRationNormSDlimit, Limit_difmax, Limit_NSW_max, LA2000ok)]
+#dtconf[ , .(SiteCode, daily, b, DiffRationNormSDlimit, Limit_difmax, Limit_NSW_max, LA2000ok)]
 dtconf[ , table(LA2000ok)]
 dtconf[LA2000ok == FALSE,  ]
 #(dtsitestats = merge(dtsitestats,  dtconf[ , .(SiteCode, daily, b, DiffRationNormSDlimit, Limit_difmax, Limit_NSW_max, LA2000ok)] , by = "SiteCode"))
